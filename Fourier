@@ -1,0 +1,19 @@
+# BME-60B-PBL-2
+Shazam
+fs = 200; %whatever we get from sound file
+t = linspace(0,2,fs); %probably won't need this
+y = 4*sin(2*pi*10*t) + 2*sin(2*pi*30*t); % Will be extracted from sound files.
+N = length(t); %Can just use length of sound file
+
+xdft = fft(y, N);
+freq = 0:fs/N:fs/2; %Frequency vector using nyquist
+
+%Power Spectral Density 
+xdft = xdft(1:N/2+1);
+psdx = (1/(fs*N))*abs(xdft).^2;
+psdx(2:end-1) = 2*psdx(2:end-1);
+
+plot(freq,psdx) %plot  power spectrum
+title("Power Spectrum of Signal Y")
+xlabel("Frequency (Hz)") 
+ylabel("Power Spectral Density(V^2/Hz)")
