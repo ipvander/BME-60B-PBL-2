@@ -21,14 +21,14 @@ for i = 1:length(GetDir)
     plot(t, Sounds(:, 1)); % Plot left channel sound against time
     xlabel('Time (s)');
     ylabel('Amplitude');
-    [pathstr, SoundName, ext] = fileparts(fileName); %breaks the file name down to the path, name
-    % of file, and its extension (aifc)
+    [pathstr, SoundName, ext] = fileparts(fileName); %breaks the file name 
+    % down to the path, name of file, and its extension (aifc)
     title(['Raw Audio Signal for ' SoundName]);
     
     N = length(Sounds(:,1));
     freq = 0:fs/N:fs/2;
     xdft = fft(Sounds(:,1), N);
-    xdft = xdft(1:N/2+1);
+    xdft = xdft(1:floor(N/2+1));
     psdx = (1/(fs*N))*abs(xdft).^2;
     psdx(2:end-1) = 2*psdx(2:end-1);
 
@@ -42,6 +42,7 @@ for i = 1:length(GetDir)
     [Peaks, Locs] = findpeaks(psdx, freq);
     [Max, idxMax] = max(Peaks);
     bestFreq = Locs(idxMax);
-    fprintf('Fundamental frequency for %s is %.2f Hz\n', SoundName, bestFreq);
+    fprintf('\n Fundamental frequency for %s is %.2f Hz\n', SoundName, ...
+        bestFreq);
 
 end
