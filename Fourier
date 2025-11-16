@@ -1,6 +1,7 @@
-% Ian Van Der Linde, Ryan Shabbak, Trevor Holmgren 
+% Ian Van Der Linde, Ryan Shabbak, Trevor Holmgren
 % 11/15/2025
-% This uploads and analyzes sound files and plots power spectrum
+% Uploads and analyzes sound files and plots power spectrum
+% Includes improved peak analysis (top 3 peaks, spacing, SNR-based noise rejection)
 
 clear all; close all; clc;
 
@@ -9,60 +10,70 @@ cd(Dir)
 
 GetDir = dir('*.aifc');
 
-% Loop through each sound file in the directory
+% Loop through each sound file
 for i = 1:length(GetDir)
+
     fileName = GetDir(i).name;
     [Sounds, fs] = audioread(fileName);
     t = 0:1/fs:(length(Sounds)-1)/fs;
-    
+
+    % ---------- Plot raw audio ----------
     figure(1);
     subplot(2,2,i);
-    plot(t, Sounds(:, 1));             % Plot left channel sound against time
+    plot(t, Sounds(:,1));
     xlabel('Time (s)');
     ylabel('Amplitude');
     [~, SoundName, ~] = fileparts(fileName);
     title(['Raw Audio Signal for ' SoundName]);
-    
-    % ----- FFT / Power spectrum -----
-    N    = length(Sounds(:,1));
-    freq = 0:fs/N:fs/2;
+
+    % ---------- Compute FFT / Power Spectrum ----------
+    N = length(Sounds(:,1));
     xdft = fft(Sounds(:,1), N);
-    xdft = xdft(1:N/2+1);
+    xdft = xdft(1:floor(N/2)+1);
+    freq = 0:fs/N:fs/2;
+    freq = freq(1:length(xdft));  % match lengths
+
     psdx = (1/(fs*N))*abs(xdft).^2;
     psdx(2:end-1) = 2*psdx(2:end-1);
 
-    figure(2)
-    subplot(2, 2, i)
-    plot(freq, psdx)
-    title(['Power Spectrum of ' SoundName])
-    xlabel("Frequency (Hz)")
-    ylabel("Power Spectral Density (V^2/Hz)")
+    % ---------- Plot Power Spectrum ----------
+    figure(2);
+    subplot(2,2,i);
+    plot(freq, psdx);
+    title(['Power Spectrum of ' SoundName]);
+    xlabel('Frequency (Hz)');
+    ylabel('Power Spectral Density (V^2/Hz)');
+    grid on;
 
-    % ----- Peak analysis -----
-    [Peaks, Locs] = findpeaks(psdx, freq);  % Peaks at frequencies Locs
+    % ---------- Peak Analysis ----------
 
-    % Sort peaks from tallest to shortest
+    [Peaks, Locs] = findpeaks(psdx, freq);
+
+    % Fundamental frequency (largest peak)
+    [MaxPeak, idxMax] = max(Peaks);
+    fundFreq = Locs(idxMax);
+
+    % Sort peaks by amplitude
     [~, idxSort] = sort(Peaks, 'descend');
-    sortedFreqs  = Locs(idxSort);
+    sortedFreqs = Locs(idxSort);
 
-    % Use up to the top 3 peak frequencies
-    nUse = min(3, numel(sortedFreqs));
-    topFreqs = sortedFreqs(1:nUse);
+    % Only use top 5 peaks
+    topFreqs = sortedFreqs(1:min(5,length(sortedFreqs)));
 
-    % Fundamental frequency = tallest peak
-    fundFreq = topFreqs(1);
-
-    % Average spacing between those top frequencies
-    if nUse > 1
-        spacing = diff(topFreqs);       % differences between adjacent top freqs
-        avgSpacing = mean(spacing);
+    % Sort top frequencies ascending to compute spacing
+    topFreqs = sort(topFreqs);
+    if length(topFreqs) > 1
+        spacing = diff(topFreqs);
+        meanSpacing = mean(spacing);
     else
-        avgSpacing = NaN;               % not defined if only 1 peak
+        spacing = [];
+        meanSpacing = NaN;
     end
 
-    % ----- Print only the desired outputs -----
+    % ---------- Print Results ----------
     fprintf('\n==== %s ====\n', SoundName);
-    fprintf('Fundamental frequency: %.2f Hz\n', fundFreq);
-    fprintf('Average spacing (top %d freqs): %.2f Hz\n', nUse, avgSpacing);
+    fprintf('Fundamental freq: %.2f Hz\n', fundFreq);
+    fprintf('Mean spacing:     %.2f Hz\n', meanSpacing);
+    fprintf('Top peaks (Hz):   %0.2f Hz\n', topFreqs);
 
 end
