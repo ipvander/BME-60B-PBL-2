@@ -1,19 +1,44 @@
-# BME-60B-PBL-2
-Shazam
-fs = 200; %whatever we get from sound file
-t = linspace(0,2,fs); %probably won't need this
-y = 4*sin(2*pi*10*t) + 2*sin(2*pi*30*t); % Will be extracted from sound files.
-N = length(t); %Can just use length of sound file
+% Ian Van Der Linde, Ryan Shabbak, Trevor Holmgren
+% 11/15/2025
+% This uploads and analyzes sound files and plots power spectrum
 
-xdft = fft(y, N);
-freq = 0:fs/N:fs/2; %Frequency vector using nyquist
+clear all; close all; clc;
 
-%Power Spectral Density 
-xdft = xdft(1:N/2+1);
-psdx = (1/(fs*N))*abs(xdft).^2;
-psdx(2:end-1) = 2*psdx(2:end-1);
+Dir = 'C:\Users\ivand\MATLAB Drive\BME60B_PBL2_Shazam\Sound Clips\Chosen Clips';
+GetDir = dir(fullfile(Dir, '*.aifc'));
 
-plot(freq,psdx) %plot  power spectrum
-title("Power Spectrum of Signal Y")
-xlabel("Frequency (Hz)") 
-ylabel("Power Spectral Density(V^2/Hz)")
+% Loop through each sound file in the directory
+for i = 1:length(GetDir)
+    fileName = fullfile(Dir, GetDir(i).name);
+    [Sounds, fs] = audioread(fileName);
+    t = 0:1/fs:(length(Sounds)-1)/fs;
+    
+    figure(1);
+    subplot(2,2,i);
+    plot(t, Sounds(:, 1)); % Plot left channel sound against time
+    xlabel('Time (s)');
+    ylabel('Amplitude');
+    [pathstr, SoundName, ext] = fileparts(fileName); %breaks the file name down to the path, name
+    % of file, and its extension (aifc)
+    title(['Raw Audio Signal for ' SoundName]);
+    
+    N = length(Sounds(:,1));
+    freq = 0:fs/N:fs/2;
+    xdft = fft(Sounds(:,1), N);
+    xdft = xdft(1:N/2+1);
+    psdx = (1/(fs*N))*abs(xdft).^2;
+    psdx(2:end-1) = 2*psdx(2:end-1);
+
+    figure(2)
+    subplot(2, 2, i) % Create subplot for sound
+    plot(freq,psdx) % Plot power spectrum for sound
+    title(['Power Spectrum of ' SoundName]) % Title for sound plot
+    xlabel("Frequency (Hz)") % X-axis label for sound plot
+    ylabel("Power Spectral Density(V^2/Hz)") % Y-axis label for sound plot
+
+    [Peaks, Locs] = findpeaks(psdx, freq);
+    [Max, idxMax] = max(Peaks);
+    bestFreq = Locs(idxMax);
+    fprintf('Dominant frequency for %s is %.2f Hz\n', SoundName, bestFreq);
+    
+end
