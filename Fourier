@@ -1,4 +1,4 @@
-% Ian Van Der Linde, Ryan Shabbak, Trevor Holmgren
+% Ian Van Der Linde, Ryan Shabbak, Trevor Holmgren 
 % 11/15/2025
 % This uploads and analyzes sound files and plots power spectrum
 
@@ -11,72 +11,58 @@ GetDir = dir('*.aifc');
 
 % Loop through each sound file in the directory
 for i = 1:length(GetDir)
-
     fileName = GetDir(i).name;
     [Sounds, fs] = audioread(fileName);
     t = 0:1/fs:(length(Sounds)-1)/fs;
-
-    % ---------- Plot raw audio ----------
+    
     figure(1);
     subplot(2,2,i);
-    plot(t, Sounds(:, 1));
+    plot(t, Sounds(:, 1));             % Plot left channel sound against time
     xlabel('Time (s)');
     ylabel('Amplitude');
     [~, SoundName, ~] = fileparts(fileName);
     title(['Raw Audio Signal for ' SoundName]);
-
-    % ---------- Compute FFT / Power Spectrum ----------
-    N = length(Sounds(:,1));
+    
+    % ----- FFT / Power spectrum -----
+    N    = length(Sounds(:,1));
     freq = 0:fs/N:fs/2;
     xdft = fft(Sounds(:,1), N);
     xdft = xdft(1:N/2+1);
-
     psdx = (1/(fs*N))*abs(xdft).^2;
     psdx(2:end-1) = 2*psdx(2:end-1);
 
-    % ---------- Plot Power Spectrum ----------
     figure(2)
     subplot(2, 2, i)
-    plot(freq,psdx)
+    plot(freq, psdx)
     title(['Power Spectrum of ' SoundName])
     xlabel("Frequency (Hz)")
     ylabel("Power Spectral Density (V^2/Hz)")
 
-    % ---------- Peak Analysis ----------
-    [Peaks, Locs] = findpeaks(psdx, freq);
+    % ----- Peak analysis -----
+    [Peaks, Locs] = findpeaks(psdx, freq);  % Peaks at frequencies Locs
 
-    % Fundamental frequency (largest peak)
-    [MaxPeak, idxMax] = max(Peaks);
-    fundFreq = Locs(idxMax);
-
-    % Sort peaks largest → smallest
+    % Sort peaks from tallest to shortest
     [~, idxSort] = sort(Peaks, 'descend');
-    sortedFreqs = Locs(idxSort);
+    sortedFreqs  = Locs(idxSort);
 
-    % Only use top N peaks (same as Shazam.m uses Ntop = 5)
-    Ntop = min(5, length(sortedFreqs));
-    topFreqs = sortedFreqs(1:Ntop);
+    % Use up to the top 3 peak frequencies
+    nUse = min(3, numel(sortedFreqs));
+    topFreqs = sortedFreqs(1:nUse);
 
-    % Compute classifier features
-    meanTopFreq = mean(topFreqs);
+    % Fundamental frequency = tallest peak
+    fundFreq = topFreqs(1);
 
-    if Ntop > 1
-        spacing = diff(topFreqs);      % differences between top peaks
-        meanSpacing = mean(spacing);
-        stdSpacing  = std(spacing);
+    % Average spacing between those top frequencies
+    if nUse > 1
+        spacing = diff(topFreqs);       % differences between adjacent top freqs
+        avgSpacing = mean(spacing);
     else
-        meanSpacing = NaN;
-        stdSpacing  = NaN;
+        avgSpacing = NaN;               % not defined if only 1 peak
     end
 
-    numPeaks = Ntop;
-
-    % ---------- Print Results ----------
+    % ----- Print only the desired outputs -----
     fprintf('\n==== %s ====\n', SoundName);
-    fprintf('Fundamental freq: %.2f Hz\n', fundFreq);
-    fprintf('Mean top freq:    %.2f Hz\n', meanTopFreq);
-    fprintf('Mean spacing:     %.2f Hz\n', meanSpacing);
-    fprintf('Std spacing:      %.2f Hz\n', stdSpacing);
-    fprintf('Num peaks:        %d\n', numPeaks);
+    fprintf('Fundamental frequency: %.2f Hz\n', fundFreq);
+    fprintf('Average spacing (top %d freqs): %.2f Hz\n', nUse, avgSpacing);
 
 end
