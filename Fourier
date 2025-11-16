@@ -1,19 +1,122 @@
-# BME-60B-PBL-2
-Shazam
-fs = 200; %whatever we get from sound file
-t = linspace(0,2,fs); %probably won't need this
-y = 4*sin(2*pi*10*t) + 2*sin(2*pi*30*t); % Will be extracted from sound files.
-N = length(t); %Can just use length of sound file
+function MusicType = Shazam(fileName)
+% Shazam  Classify a sound clip (animals, classical, country, EDM, unknown)
+% Uses: (A) improved frequency ranges + (B) harmonic spacing / # of peaks
 
-xdft = fft(y, N);
-freq = 0:fs/N:fs/2; %Frequency vector using nyquist
+    % ----- 1. Read audio -----
+    [sounds, fs] = audioread(fileName);
+    left = sounds(:,1);                     % use left channel only
 
-%Power Spectral Density 
-xdft = xdft(1:N/2+1);
-psdx = (1/(fs*N))*abs(xdft).^2;
-psdx(2:end-1) = 2*psdx(2:end-1);
+    % ----- 2. FFT and power spectrum -----
+    N  = length(left);
+    Y  = fft(left);
+    P2 = abs(Y/N).^2;                       % power spectrum (two-sided)
+    P1 = P2(1:floor(N/2)+1);               % one-sided
+    f  = fs*(0:floor(N/2))/N;              % frequency axis
 
-plot(freq,psdx) %plot  power spectrum
-title("Power Spectrum of Signal Y")
-xlabel("Frequency (Hz)") 
-ylabel("Power Spectral Density(V^2/Hz)")
+    % ----- 3. Find strong peaks -----
+    % Only look at peaks that are at least 20% of the max
+    [pk, locs] = findpeaks(P1, f, ...
+        'MinPeakHeight', 0.2*max(P1), ...
+        'MinPeakDistance', 20);            % Hz – tweak as needed
+
+    % If not enough peaks, classify as unknown right away
+    if numel(pk) < 1
+        MusicType = 'Unknown';
+        fprintf('%s  -->  Unknown (no clear peaks)\n', fileName);
+        return;
+    end
+
+    % Sort peaks by height (largest first)
+    [pkSorted, idx] = sort(pk, 'descend');
+    freqSorted      = locs(idx);
+
+    % Top N peaks (for A + B)
+    Ntop       = min(5, numel(freqSorted));
+    topFreqs   = freqSorted(1:Ntop);
+
+    % ----- Features for A -----
+    fundFreq    = topFreqs(1);             % biggest peak
+    meanTopFreq = mean(topFreqs);          % average of top peaks
+
+    % ----- Features for B (harmonics) -----
+    if Ntop > 1
+        spacing     = diff(topFreqs);      % differences between peaks
+        meanSpacing = mean(spacing);       % approx harmonic spacing
+        stdSpacing  = std(spacing);        % how regular the spacing is
+    else
+        meanSpacing = NaN;
+        stdSpacing  = NaN;
+    end
+    numPeaks = Ntop;
+
+    % ----- DEBUG print (super helpful while tuning ranges) -----
+    fprintf('\nFile: %s\n', fileName);
+    fprintf('  fundFreq     = %.2f Hz\n', fundFreq);
+    fprintf('  meanTopFreq  = %.2f Hz\n', meanTopFreq);
+    fprintf('  meanSpacing  = %.2f Hz   (std = %.1f)\n', meanSpacing, stdSpacing);
+    fprintf('  numPeaks     = %d\n', numPeaks);
+
+    % ============================================================
+    %                 CLASSIFICATION RULES
+    %    >>> YOU MUST FILL THESE IN FROM YOUR ANALYSIS <<<
+    % ============================================================
+
+    % --------- Example (FAKE) ranges – replace with your own -----
+    % these are just made-up numbers to show the structure
+    animalFundRange     = [150 350];
+    animalSpacingRange  = [50 200];
+    animalMinPeaks      = 1;
+    animalMaxPeaks      = 3;
+
+    countryFundRange    = [300 600];
+    countrySpacingRange = [80 300];
+    countryMinPeaks     = 2;
+    countryMaxPeaks     = 5;
+
+    classicalFundRange  = [500 1200];
+    classicalSpacingRange = [30 150];
+    classicalMinPeaks   = 4;
+    classicalMaxPeaks   = 999;
+
+    edmFundRange        = [50 250];
+    edmSpacingRange     = [150 400];
+    edmMinPeaks         = 1;
+    edmMaxPeaks         = 4;
+
+    % Helper anonymous for "in range"
+    inRange = @(val, R) ~isnan(val) && val >= R(1) && val <= R(2);
+
+    % ----- 4. IF / ELSE classifier using A + B -----
+
+    if inRange(fundFreq, animalFundRange) && ...
+       inRange(meanSpacing, animalSpacingRange) && ...
+       numPeaks >= animalMinPeaks && numPeaks <= animalMaxPeaks
+
+        MusicType = 'Animals';
+
+    elseif inRange(fundFreq, countryFundRange) && ...
+           inRange(meanSpacing, countrySpacingRange) && ...
+           numPeaks >= countryMinPeaks && numPeaks <= countryMaxPeaks
+
+        MusicType = 'Country';
+
+    elseif inRange(fundFreq, classicalFundRange) && ...
+           inRange(meanSpacing, classicalSpacingRange) && ...
+           numPeaks >= classicalMinPeaks && numPeaks <= classicalMaxPeaks && ...
+           stdSpacing < 80        % "regular" spacing → lots of harmonics
+
+        MusicType = 'Classical';
+
+    elseif inRange(fundFreq, edmFundRange) && ...
+           inRange(meanSpacing, edmSpacingRange) && ...
+           numPeaks >= edmMinPeaks && numPeaks <= edmMaxPeaks
+
+        MusicType = 'EDM';
+
+    else
+        MusicType = 'Unknown';
+    end
+
+    fprintf('  ==> Classified as: %s\n', MusicType);
+
+end
