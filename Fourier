@@ -5,43 +5,78 @@
 clear all; close all; clc;
 
 Dir = fullfile(pwd, 'Sound Clips', 'Chosen Clips');
-
 cd(Dir)
 
 GetDir = dir('*.aifc');
 
 % Loop through each sound file in the directory
 for i = 1:length(GetDir)
+
     fileName = GetDir(i).name;
     [Sounds, fs] = audioread(fileName);
     t = 0:1/fs:(length(Sounds)-1)/fs;
-    
+
+    % ---------- Plot raw audio ----------
     figure(1);
     subplot(2,2,i);
-    plot(t, Sounds(:, 1)); % Plot left channel sound against time
+    plot(t, Sounds(:, 1));
     xlabel('Time (s)');
     ylabel('Amplitude');
-    [pathstr, SoundName, ext] = fileparts(fileName); %breaks the file name down to the path, name
-    % of file, and its extension (aifc)
+    [~, SoundName, ~] = fileparts(fileName);
     title(['Raw Audio Signal for ' SoundName]);
-    
+
+    % ---------- Compute FFT / Power Spectrum ----------
     N = length(Sounds(:,1));
     freq = 0:fs/N:fs/2;
     xdft = fft(Sounds(:,1), N);
     xdft = xdft(1:N/2+1);
+
     psdx = (1/(fs*N))*abs(xdft).^2;
     psdx(2:end-1) = 2*psdx(2:end-1);
 
+    % ---------- Plot Power Spectrum ----------
     figure(2)
-    subplot(2, 2, i) % Create subplot for sound
-    plot(freq,psdx) % Plot power spectrum for sound
-    title(['Power Spectrum of ' SoundName]) % Title for sound plot
-    xlabel("Frequency (Hz)") % X-axis label for sound plot
-    ylabel("Power Spectral Density(V^2/Hz)") % Y-axis label for sound plot
+    subplot(2, 2, i)
+    plot(freq,psdx)
+    title(['Power Spectrum of ' SoundName])
+    xlabel("Frequency (Hz)")
+    ylabel("Power Spectral Density (V^2/Hz)")
 
+    % ---------- Peak Analysis ----------
     [Peaks, Locs] = findpeaks(psdx, freq);
-    [Max, idxMax] = max(Peaks);
-    bestFreq = Locs(idxMax);
-    fprintf('Fundamental frequency for %s is %.2f Hz\n', SoundName, bestFreq);
+
+    % Fundamental frequency (largest peak)
+    [MaxPeak, idxMax] = max(Peaks);
+    fundFreq = Locs(idxMax);
+
+    % Sort peaks largest → smallest
+    [~, idxSort] = sort(Peaks, 'descend');
+    sortedFreqs = Locs(idxSort);
+
+    % Only use top N peaks (same as Shazam.m uses Ntop = 5)
+    Ntop = min(5, length(sortedFreqs));
+    topFreqs = sortedFreqs(1:Ntop);
+
+    % Compute classifier features
+    meanTopFreq = mean(topFreqs);
+
+    if Ntop > 1
+        spacing = diff(topFreqs);      % differences between top peaks
+        meanSpacing = mean(spacing);
+        stdSpacing  = std(spacing);
+    else
+        meanSpacing = NaN;
+        stdSpacing  = NaN;
+    end
+
+    numPeaks = Ntop;
+
+    % ---------- Print Results ----------
+    fprintf('\n==== %s ====\n', SoundName);
+    fprintf('Fundamental freq: %.2f Hz\n', fundFreq);
+    fprintf('Mean top freq:    %.2f Hz\n', meanTopFreq);
+    fprintf('Mean spacing:     %.2f Hz\n', meanSpacing);
+    fprintf('Std spacing:      %.2f Hz\n', stdSpacing);
+    fprintf('Num peaks:        %d\n', numPeaks);
 
 end
