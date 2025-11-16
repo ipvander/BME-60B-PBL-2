@@ -1,79 +1,75 @@
-% Ian Van Der Linde, Ryan Shabbak, Trevor Holmgren
-% 11/15/2025
-% Uploads and analyzes sound files and plots power spectrum
-% Includes improved peak analysis (top 3 peaks, spacing, SNR-based noise rejection)
+==== animals ====
+Fundamental freq: 912.13 Hz
+Mean spacing:     12.09 Hz
+Top peaks (Hz):   896.66 Hz, 1.132992e-04 V^2/Hz 
+Top peaks (Hz):   897.20 Hz, 1.012849e-04 V^2/Hz 
+Top peaks (Hz):   897.38 Hz, 1.202759e-04 V^2/Hz 
+Top peaks (Hz):   897.57 Hz, 1.178275e-04 V^2/Hz 
+Top peaks (Hz):   898.74 Hz, 1.048942e-04 V^2/Hz 
+Top peaks (Hz):   898.92 Hz, 1.083538e-04 V^2/Hz 
+Top peaks (Hz):   909.87 Hz, 1.143736e-04 V^2/Hz 
+Top peaks (Hz):   910.41 Hz, 2.466037e-04 V^2/Hz 
+Top peaks (Hz):   912.13 Hz, 2.656548e-04 V^2/Hz 
+Top peaks (Hz):   912.31 Hz, 2.413596e-04 V^2/Hz 
+Top peaks (Hz):   912.49 Hz, 2.248297e-04 V^2/Hz 
+Top peaks (Hz):   913.94 Hz, 1.303959e-04 V^2/Hz 
+Top peaks (Hz):   914.12 Hz, 1.085867e-04 V^2/Hz 
+Top peaks (Hz):   1038.58 Hz, 1.036870e-04 V^2/Hz 
+Top peaks (Hz):   1065.99 Hz, 1.036594e-04 V^2/Hz 
 
-clear all; close all; clc;
+==== classical ====
+Fundamental freq: 1074.89 Hz
+Mean spacing:     13.36 Hz
+Top peaks (Hz):   892.89 Hz, 5.047093e-05 V^2/Hz 
+Top peaks (Hz):   895.01 Hz, 4.965400e-05 V^2/Hz 
+Top peaks (Hz):   897.53 Hz, 5.982046e-05 V^2/Hz 
+Top peaks (Hz):   899.65 Hz, 5.593916e-05 V^2/Hz 
+Top peaks (Hz):   899.90 Hz, 5.642422e-05 V^2/Hz 
+Top peaks (Hz):   1060.63 Hz, 7.866186e-05 V^2/Hz 
+Top peaks (Hz):   1062.34 Hz, 5.731398e-05 V^2/Hz 
+Top peaks (Hz):   1070.17 Hz, 7.357229e-05 V^2/Hz 
+Top peaks (Hz):   1070.33 Hz, 6.225616e-05 V^2/Hz 
+Top peaks (Hz):   1071.14 Hz, 6.170328e-05 V^2/Hz 
+Top peaks (Hz):   1071.39 Hz, 5.107754e-05 V^2/Hz 
+Top peaks (Hz):   1073.26 Hz, 4.702078e-05 V^2/Hz 
+Top peaks (Hz):   1074.89 Hz, 2.130662e-04 V^2/Hz 
+Top peaks (Hz):   1075.13 Hz, 1.919076e-04 V^2/Hz 
+Top peaks (Hz):   1079.94 Hz, 4.916147e-05 V^2/Hz 
 
-Dir = fullfile(pwd, 'Sound Clips', 'Chosen Clips');
-cd(Dir)
+==== country ====
+Fundamental freq: 881.89 Hz
+Mean spacing:     36.59 Hz
+Top peaks (Hz):   369.67 Hz, 6.835790e-04 V^2/Hz 
+Top peaks (Hz):   587.84 Hz, 6.631220e-04 V^2/Hz 
+Top peaks (Hz):   588.09 Hz, 9.575687e-04 V^2/Hz 
+Top peaks (Hz):   588.26 Hz, 7.485847e-04 V^2/Hz 
+Top peaks (Hz):   588.92 Hz, 1.276192e-03 V^2/Hz 
+Top peaks (Hz):   589.09 Hz, 1.355618e-03 V^2/Hz 
+Top peaks (Hz):   589.33 Hz, 1.408505e-03 V^2/Hz 
+Top peaks (Hz):   590.41 Hz, 7.389461e-04 V^2/Hz 
+Top peaks (Hz):   877.91 Hz, 7.441588e-04 V^2/Hz 
+Top peaks (Hz):   878.49 Hz, 8.319841e-04 V^2/Hz 
+Top peaks (Hz):   879.24 Hz, 7.540199e-04 V^2/Hz 
+Top peaks (Hz):   879.65 Hz, 1.177377e-03 V^2/Hz 
+Top peaks (Hz):   880.81 Hz, 8.715513e-04 V^2/Hz 
+Top peaks (Hz):   881.14 Hz, 8.399193e-04 V^2/Hz 
+Top peaks (Hz):   881.89 Hz, 1.724366e-03 V^2/Hz 
 
-GetDir = dir('*.aifc');
-
-% Loop through each sound file
-for i = 1:length(GetDir)
-
-    fileName = GetDir(i).name;
-    [Sounds, fs] = audioread(fileName);
-    t = 0:1/fs:(length(Sounds)-1)/fs;
-
-    % ---------- Plot raw audio ----------
-    figure(1);
-    subplot(2,2,i);
-    plot(t, Sounds(:,1));
-    xlabel('Time (s)');
-    ylabel('Amplitude');
-    [~, SoundName, ~] = fileparts(fileName);
-    title(['Raw Audio Signal for ' SoundName]);
-
-    % ---------- Compute FFT / Power Spectrum ----------
-    N = length(Sounds(:,1));
-    xdft = fft(Sounds(:,1), N);
-    xdft = xdft(1:floor(N/2)+1);
-    freq = 0:fs/N:fs/2;
-    freq = freq(1:length(xdft));  % match lengths
-
-    psdx = (1/(fs*N))*abs(xdft).^2;
-    psdx(2:end-1) = 2*psdx(2:end-1);
-
-    % ---------- Plot Power Spectrum ----------
-    figure(2);
-    subplot(2,2,i);
-    plot(freq, psdx);
-    title(['Power Spectrum of ' SoundName]);
-    xlabel('Frequency (Hz)');
-    ylabel('Power Spectral Density (V^2/Hz)');
-    grid on;
-
-    % ---------- Peak Analysis ----------
-
-    [Peaks, Locs] = findpeaks(psdx, freq);
-
-    % Fundamental frequency (largest peak)
-    [MaxPeak, idxMax] = max(Peaks);
-    fundFreq = Locs(idxMax);
-
-    % Sort peaks by amplitude
-    [~, idxSort] = sort(Peaks, 'descend');
-    sortedFreqs = Locs(idxSort);
-
-    % Only use top 5 peaks
-    topFreqs = sortedFreqs(1:min(5,length(sortedFreqs)));
-
-    % Sort top frequencies ascending to compute spacing
-    topFreqs = sort(topFreqs);
-    if length(topFreqs) > 1
-        spacing = diff(topFreqs);
-        meanSpacing = mean(spacing);
-    else
-        spacing = [];
-        meanSpacing = NaN;
-    end
-
-    % ---------- Print Results ----------
-    fprintf('\n==== %s ====\n', SoundName);
-    fprintf('Fundamental freq: %.2f Hz\n', fundFreq);
-    fprintf('Mean spacing:     %.2f Hz\n', meanSpacing);
-    fprintf('Top peaks (Hz):   %0.2f Hz\n', topFreqs);
-
-end
+==== edm ====
+Fundamental freq: 31.74 Hz
+Mean spacing:     9.67 Hz
+Top peaks (Hz):   29.66 Hz, 1.945033e-02 V^2/Hz 
+Top peaks (Hz):   31.74 Hz, 1.265217e-01 V^2/Hz 
+Top peaks (Hz):   31.98 Hz, 2.662182e-03 V^2/Hz 
+Top peaks (Hz):   33.66 Hz, 5.405974e-03 V^2/Hz 
+Top peaks (Hz):   33.90 Hz, 8.805628e-02 V^2/Hz 
+Top peaks (Hz):   34.06 Hz, 5.238690e-03 V^2/Hz 
+Top peaks (Hz):   35.98 Hz, 1.637854e-02 V^2/Hz 
+Top peaks (Hz):   63.48 Hz, 2.542895e-03 V^2/Hz 
+Top peaks (Hz):   65.64 Hz, 1.978219e-03 V^2/Hz 
+Top peaks (Hz):   67.72 Hz, 3.636943e-03 V^2/Hz 
+Top peaks (Hz):   95.23 Hz, 3.578209e-03 V^2/Hz 
+Top peaks (Hz):   97.38 Hz, 7.893640e-03 V^2/Hz 
+Top peaks (Hz):   99.46 Hz, 4.485244e-03 V^2/Hz 
+Top peaks (Hz):   101.62 Hz, 2.419095e-03 V^2/Hz 
+Top peaks (Hz):   165.11 Hz, 2.676051e-03 V^2/Hz 
