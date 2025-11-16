@@ -4,12 +4,15 @@
 
 clear all; close all; clc;
 
-Dir = 'C:\Users\ivand\MATLAB Drive\BME60B_PBL2_Shazam\Sound Clips\Chosen Clips';
-GetDir = dir(fullfile(Dir, '*.aifc'));
+Dir = fullfile(pwd, 'Sound Clips', 'Chosen Clips');
+
+cd(Dir)
+
+GetDir = dir('*.aifc');
 
 % Loop through each sound file in the directory
 for i = 1:length(GetDir)
-    fileName = fullfile(Dir, GetDir(i).name);
+    fileName = GetDir(i).name;
     [Sounds, fs] = audioread(fileName);
     t = 0:1/fs:(length(Sounds)-1)/fs;
     
@@ -40,5 +43,5 @@ for i = 1:length(GetDir)
     [Max, idxMax] = max(Peaks);
     bestFreq = Locs(idxMax);
     fprintf('Fundamental frequency for %s is %.2f Hz\n', SoundName, bestFreq);
-    
+
 end
