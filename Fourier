@@ -45,7 +45,7 @@
         % Mean spacing comparison
         if ~isnan(meanSpacing)
             spacingDiff = abs(meanSpacing - bm.meanSpacing);
-            score = score + max(0, 1 - spacingDiff/5);
+            score = score + max(0, 1 - spacingDiff/5); % scale weight
         end
 
         scores(k) = score;
