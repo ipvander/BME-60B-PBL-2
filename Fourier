@@ -39,6 +39,6 @@ for i = 1:length(GetDir)
     [Peaks, Locs] = findpeaks(psdx, freq);
     [Max, idxMax] = max(Peaks);
     bestFreq = Locs(idxMax);
-    fprintf('Dominant frequency for %s is %.2f Hz\n', SoundName, bestFreq);
+    fprintf('Fundamental frequency for %s is %.2f Hz\n', SoundName, bestFreq);
     
 end
