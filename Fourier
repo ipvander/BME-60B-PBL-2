@@ -1,133 +1,59 @@
-function MusicType = Shazam(fileName)
-% Shazam  Classify a sound clip (animals, classical, country, EDM, or Unknown)
-% Uses same FFT / peak analysis as PBL2_Analysis.m
+%Ryan Shabbak, Ian Van Der Linde, Trevor Holmgren
+%11/15/2025
 
-    % ---------- 1. Read audio ----------
-    [Sounds, fs] = audioread(fileName);
-    left = Sounds(:,1);                 % left channel only
-
-    % ---------- 2. FFT / power spectrum ----------
-    N    = length(left);
-    xdft = fft(left, N);
-    xdft = xdft(1:floor(N/2)+1);        % positive freqs only
-
-    freq = 0:fs/N:fs/2;
-    freq = freq(1:length(xdft));        % match lengths
-
-    psdx = (1/(fs*N))*abs(xdft).^2;
-    psdx(2:end-1) = 2*psdx(2:end-1);    % fold negative freqs
-
-    % ---------- 3. Peak analysis ----------
-    [Peaks, Locs] = findpeaks(psdx, freq);
-
-    if isempty(Peaks)
-        MusicType = 'Unknown';
-        fprintf('\nFile: %s\n  (no peaks found)\n', fileName);
-        return;
-    end
-
-    % Strong peaks: 10% of max
-    peakThresh   = 0.10 * max(Peaks);
-    strongMask   = Peaks >= peakThresh;
-    strongPeaks  = Peaks(strongMask);
-    strongLocs   = Locs(strongMask);
-
-    % Fallback if nothing passes
-    if isempty(strongPeaks)
-        strongPeaks = Peaks;
-        strongLocs  = Locs;
-    end
-
-    % Fundamental = highest strong peak
-    [~, idxMax] = max(strongPeaks);
-    fundFreq    = strongLocs(idxMax);
-
-    % Sort by height, take top 10 for spacing
-    [~, idxSort] = sort(strongPeaks, 'descend');
-    sortedFreqs  = strongLocs(idxSort);
-    topFreqs     = sortedFreqs(1:min(10, length(sortedFreqs)));
-
-    % Sort by frequency and compute spacing
-    topFreqs = sort(topFreqs);
-    if numel(topFreqs) > 1
-        spacing     = diff(topFreqs);
-        meanSpacing = mean(spacing);
+%testShazam script
+% Script to test our Shazam function on known and unknown sound clips
+clear; clc; close all;
+fprintf('Testing Shazam.m\n\n');
+% Test all of the 4 known sound files
+% Runs the Shazam classifier on a small set of labeled training clips
+knownFiles = { ...
+    'animals.aifc', ...
+    'classical.aifc', ...
+    'country.aifc', ...
+    'edm.aifc' };
+knownLabels = { ...
+    'Animals', ...
+    'Classical', ...
+    'Country', ...
+    'EDM' };
+fprintf('Known files:\n');
+for k = 1:numel(knownFiles)
+    file = knownFiles{k};
+    expected = knownLabels{k};
+    if exist(file, 'file')
+        musicType = Shazam(file);
+        fprintf('Expected: %s\n\n', expected);
     else
-        meanSpacing = NaN;
+        fprintf('  File not found in current folder. Skipping.\n\n');
     end
-
-    % Number of strong peaks
-    numPeaks = numel(strongPeaks);
-
-    % ---------- Debug print ----------
-    fprintf('\nFile: %s\n', fileName);
-    fprintf('  fundFreq    = %.2f Hz\n', fundFreq);
-    fprintf('  meanSpacing = %.2f Hz\n', meanSpacing);
-    fprintf('  numPeaks    = %d\n',     numPeaks);
-
-    % ============================================================
-    %              CLASSIFICATION RANGES (TUNED)
-    % ============================================================
-
-    inRange = @(val, R) ~isnan(val) && val >= R(1) && val <= R(2);
-
-    % ---- Animals ----
-    % animals.aifc: 912 Hz, 1.94 Hz, 388 peaks
-    animalFundRange    = [880 950];
-    animalSpacingRange = [0   5];
-    animalPeaksRange   = [200 800];
-
-    % ---- Classical ----
-    % classical.aifc: 1075 Hz, 19.73 Hz, 57 peaks
-    classicalFundRange    = [1020 1120];
-    classicalSpacingRange = [10   35];
-    classicalPeaksRange   = [40   100];
-
-    % ---- Country ----
-    % country.aifc: 882 Hz, 32.64 Hz, 125 peaks
-    % allow two possible fund bands (from analysis:
-    % ~880 Hz and lower band around ~590 Hz from earlier plots)
-    countryFundRange1   = [560 620];    % lower possible band
-    countryFundRange2   = [840 920];    % main band around 882 Hz
-    countrySpacingRange = [20  50];
-    countryPeaksRange   = [80  200];
-
-    % ---- EDM ----
-    % edm.aifc: 31.74 Hz, 2.11 Hz, 4 peaks
-    % Other low-fund songs have fund ~45–65 Hz and many more peaks.
-    edmFundRange        = [25  40];
-    edmSpacingRange     = [0.5 4.5];
-    edmPeaksRange       = [1   8];
-
-    % ---------- 4. IF / ELSE classifier ----------
-    if inRange(fundFreq, animalFundRange) && ...
-       inRange(meanSpacing, animalSpacingRange) && ...
-       inRange(numPeaks,  animalPeaksRange)
-
-        MusicType = 'Animals';
-
-    elseif inRange(fundFreq, classicalFundRange) && ...
-           inRange(meanSpacing, classicalSpacingRange) && ...
-           inRange(numPeaks,  classicalPeaksRange)
-
-        MusicType = 'Classical';
-
-    elseif ( inRange(fundFreq, countryFundRange1) || ...
-             inRange(fundFreq, countryFundRange2) ) && ...
-           inRange(meanSpacing, countrySpacingRange) && ...
-           inRange(numPeaks,  countryPeaksRange)
-
-        MusicType = 'Country';
-
-    elseif inRange(fundFreq, edmFundRange) && ...
-           inRange(meanSpacing, edmSpacingRange) && ...
-           inRange(numPeaks,  edmPeaksRange)
-
-        MusicType = 'EDM';
-
-    else
-        MusicType = 'Unknown';
-    end
-
-    fprintf('Classified as: %s\n', MusicType);
 end
+% Test all of the unknown sound files
+% Runs Shazam on several unknown files and print results
+unknownFiles = { ...
+    'all star inverted.aifc', ...
+    'all star.aifc', ...
+    'blue.aifc', ...
+    'careless whisper.aifc', ...
+    'despacito.aifc', ...
+    'drake.aifc', ...
+    'friday.aifc', ...
+    'kekistan.aifc', ...
+    'lion.aifc', ...
+    'peanut butter jelly time.aifc', ...
+    'rick roll.aifc', ...
+    'talking cat.aifc', ...
+    'what is love.aifc', ...
+    'x files.aifc' };
+fprintf('Testing Unknown Files:\n\n');
+for k = 1:numel(unknownFiles)
+    file = unknownFiles{k};
+    fprintf('Testing file: %s\n', file);
+    if exist(file, 'file')
+        musicType = Shazam(file);
+        fprintf('  Shazam classification: %s\n\n', musicType);
+    else
+        fprintf('  File not found in current folder. Skipping.\n\n');
+    end
+end
+fprintf('All tests complete.\n');
