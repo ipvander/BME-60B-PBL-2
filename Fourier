@@ -7,6 +7,15 @@ function MusicType = Shazam(fileName)
     [Sounds, fs] = audioread(fileName); % Read audio file and sampling rate
     left         = Sounds(:,1); % Use left channel only
 
+    % Plot raw audio 
+    figure; %Set to new figure
+    subplot(2,1,1); %Assign current sound plot to subplot
+    plot(t, Sounds(:,1)); %Plot sounds over time
+    xlabel('Time (s)'); %Label x axis
+    ylabel('Amplitude'); %Label y axis
+    [~, SoundName, ~] = fileparts(fileName); %Extract SoundName from file
+    title(['Raw Audio Signal for ' SoundName]); %Soft code title
+
     % FFT/power spectrum
     N    = length(left); % Number of samples in signal
     xdft = fft(left, N); % Compute N-point FFT
@@ -17,6 +26,14 @@ function MusicType = Shazam(fileName)
 
     psdx = (1/(fs*N)) * abs(xdft).^2; % Convert FFT to power spectral density
     psdx(2:end-1) = 2*psdx(2:end-1); % Double interior values (fold negative freqs)
+
+    % Plot Power Spectrum 
+    subplot(2,1,2); %Assign current power spectrum to subplot
+    plot(freq, psdx); %Plot power spectrum
+    title(['Power Spectrum of ' SoundName]); %Soft code title
+    xlabel('Frequency (Hz)'); %Lable x axis
+    ylabel('Power Spectral Density (V^2/Hz)'); %Label y axis
+    grid on; %Turn on grid for visibility
 
     % Peaks analysis
     [Peaks, Locs] = findpeaks(psdx, freq); % Find spectral peaks and their frequencies
