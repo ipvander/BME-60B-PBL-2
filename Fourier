@@ -1,48 +1,86 @@
 % Ian Van Der Linde, Ryan Shabbak, Trevor Holmgren
 % 11/15/2025
-% This uploads and analyzes sound files and plots power spectrum
-
+% Uploads and analyzes sound files and plots power spectrum
+% Includes improved peak analysis (number top peaks, spacing)
 clear all; close all; clc;
 
-Dir = fullfile(pwd, 'Sound Clips', 'Chosen Clips');
+Dir = fullfile(pwd, 'Sound Clips', 'Chosen Clips'); %Pulls up 4 known sound
+cd(Dir) % Sets Chosen Clips as directory
+GetDir = dir('*.aifc'); %Uploads known sounds
 
-cd(Dir)
-
-GetDir = dir('*.aifc');
-
-% Loop through each sound file in the directory
+% Loop through files returned by GetDir and process each audio file
 for i = 1:length(GetDir)
-    fileName = GetDir(i).name;
-    [Sounds, fs] = audioread(fileName);
-    t = 0:1/fs:(length(Sounds)-1)/fs;
-    
-    figure(1);
-    subplot(2,2,i);
-    plot(t, Sounds(:, 1)); % Plot left channel sound against time
-    xlabel('Time (s)');
-    ylabel('Amplitude');
-    [pathstr, SoundName, ext] = fileparts(fileName); %breaks the file name 
-    % down to the path, name of file, and its extension (aifc)
-    title(['Raw Audio Signal for ' SoundName]);
-    
+    fileName = GetDir(i).name; % Gets file name
+    [Sounds, fs] = audioread(fileName); %Extracts sound & sample rate
+    t = 0:1/fs:(length(Sounds)-1)/fs; %Create time vector
+
+    % Plot raw audio 
+    figure(1); %Set to figure of soundwaves
+    subplot(2,2,i); %Assign current sound plot to subplot
+    plot(t, Sounds(:,1)); %Plot sounds over time
+    xlabel('Time (s)'); %Label x axis
+    ylabel('Amplitude'); %Label y axis
+    [~, SoundName, ~] = fileparts(fileName); %Extract SoundName from file
+    title(['Raw Audio Signal for ' SoundName]); %Soft code title
+
+    % Compute FFT / Power Spectrum 
     N = length(Sounds(:,1));
-    freq = 0:fs/N:fs/2;
-    xdft = fft(Sounds(:,1), N);
-    xdft = xdft(1:floor(N/2+1));
-    psdx = (1/(fs*N))*abs(xdft).^2;
-    psdx(2:end-1) = 2*psdx(2:end-1);
+    xdft = fft(Sounds(:,1), N); %Compute FFT
+    xdft = xdft(1:floor(N/2)+1); %Keep only positive frequencies
+    freq = 0:fs/N:fs/2; %Create frequency vector
+    freq = freq(1:length(xdft));  %match lengths
+    psdx = (1/(fs*N))*abs(xdft).^2; %Calculate power spectral density
+    psdx(2:end-1) = 2*psdx(2:end-1); %Adjust for single side spectrum
 
-    figure(2)
-    subplot(2, 2, i) % Create subplot for sound
-    plot(freq,psdx) % Plot power spectrum for sound
-    title(['Power Spectrum of ' SoundName]) % Title for sound plot
-    xlabel("Frequency (Hz)") % X-axis label for sound plot
-    ylabel("Power Spectral Density(V^2/Hz)") % Y-axis label for sound plot
+    % Plot Power Spectrum 
+    figure(2); %Set to figure of power spectrums
+    subplot(2,2,i); %Assign current power spectrum to subplot
+    plot(freq, psdx); %Plot power spectrum
+    title(['Power Spectrum of ' SoundName]); %Soft code title
+    xlabel('Frequency (Hz)'); %Lable x axis
+    ylabel('Power Spectral Density (V^2/Hz)'); %Label y axis
+    grid on; %Turn on grid for visibility
 
-    [Peaks, Locs] = findpeaks(psdx, freq);
-    [Max, idxMax] = max(Peaks);
-    bestFreq = Locs(idxMax);
-    fprintf('\n Fundamental frequency for %s is %.2f Hz\n', SoundName, ...
-        bestFreq);
+    % Peaks analysis
+    [Peaks, Locs] = findpeaks(psdx, freq); % Find spectral peaks and their frequencies
 
+    if isempty(Peaks) % If no peaks are found
+        MusicType = 'Unknown'; % Return "Unknown"
+        fprintf('\nFile: %s\n  (no peaks found)\n', fileName); % Print message
+        return; % Exit function
+    end % End empty peak check
+
+
+    peakThresh   = 0.10 * max(Peaks); % Threshold = 10% of maximum peak height
+    strongMask   = Peaks >= peakThresh; % Logical mask for "strong" peaks
+    strongPeaks  = Peaks(strongMask); % Strong peak heights
+    strongLocs   = Locs(strongMask); % Strong peak frequencies
+
+    if isempty(strongPeaks) % If no peaks pass the threshold
+        strongPeaks = Peaks; % Fall back to all peaks
+        strongLocs  = Locs; % Use all peak locations
+    end % End fallback check
+
+    [~, idxMax] = max(strongPeaks); % Index of largest strong peak
+    fundFreq    = strongLocs(idxMax); % Fundamental frequency (dominant strong peak)
+
+    [~, idxSort] = sort(strongPeaks, 'descend'); % Sort strong peaks by height (descending)
+    sortedFreqs  = strongLocs(idxSort); % Reorder frequencies by peak height
+    topFreqs     = sortedFreqs(1:min(10, length(sortedFreqs))); % Take top 10 strong frequencies
+
+    topFreqs = sort(topFreqs); % Sort chosen peaks by frequency
+    if numel(topFreqs) > 1 % If more than one peak is available
+        spacing = diff(topFreqs); % Frequency differences between peaks
+        meanSpacing = mean(spacing); % Average spacing between top peaks
+    else % If only one peak is available
+        meanSpacing = NaN; % Spacing is undefined (set to NaN)
+    end % End spacing calculation
+
+    numPeaks = numel(strongPeaks); % Count total number of strong peaks
+
+    % Print information
+    fprintf('\nFile: %s\n', fileName); % Print file name
+    fprintf('  fundFreq    = %.2f Hz\n', fundFreq); % Print fundamental frequency
+    fprintf('  meanSpacing = %.2f Hz\n', meanSpacing); % Print mean spacing
+    fprintf('  numPeaks    = %d\n',     numPeaks);  % Print number of strong peaks
 end
