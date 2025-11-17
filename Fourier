@@ -1,136 +1,127 @@
+% Ian Van Der Linde, Ryan Shabbak, Trevor Holmgren
+% 11/15/2025
 function MusicType = Shazam(fileName)
-% Shazam  Classify a sound clip (Animals, Classical, Country, EDM, Unknown)
-% Uses FFT peaks: fundamental frequency, harmonic spacing, and # of peaks.
+% Shazam  Classifies a sound clip as Animals, Classical, Country, EDM, or Unknown
 
-    % ---------- 1. Read audio ----------
-    [sounds, fs] = audioread(fileName);   % sounds = [Nsamples x Nchannels], fs = sample rate
-    left = sounds(:,1);                   % Use left channel only
+    % Reads the audio
+    [Sounds, fs] = audioread(fileName); % Read audio file and sampling rate
+    left         = Sounds(:,1); % Use left channel only
 
-    % ---------- 2. FFT and power spectrum ----------
-    N  = length(left);                    % Number of samples
-    Y  = fft(left);                       % Discrete Fourier Transform
-    P2 = abs(Y/N).^2;                     % Two-sided power spectrum (normalized)
-    halfN = floor(N/2);                   % Integer half-length for indexing
-    P1 = P2(1:halfN+1);                   % One-sided power spectrum
-    f  = fs*(0:halfN)/N;                  % Frequency axis for P1
+    % FFT/power spectrum
+    N    = length(left); % Number of samples in signal
+    xdft = fft(left, N); % Compute N-point FFT
+    xdft = xdft(1:floor(N/2)+1); % Keep positive frequency components only
 
-    % ---------- 3. Find strong peaks ----------
-    % We keep only peaks that are relatively large and not too close together.
-    [pk, locs] = findpeaks(P1, f, ...
-        'MinPeakHeight', 0.2*max(P1), ... % ≥ 20% of maximum power
-        'MinPeakDistance', 20);           % At least 20 Hz apart
+    freq = 0:fs/N:fs/2; % Frequency vector from 0 to Nyquist
+    freq = freq(1:length(xdft)); % Trim frequency vector to match FFT length
 
-    % If there are no clear peaks, we can't classify reliably.
-    if numel(pk) < 1
-        MusicType = 'Unknown';
-        fprintf('%s  -->  Unknown (no clear peaks)\n', fileName);
-        return;
-    end
+    psdx = (1/(fs*N)) * abs(xdft).^2; % Convert FFT to power spectral density
+    psdx(2:end-1) = 2*psdx(2:end-1); % Double interior values (fold negative freqs)
 
-    % Sort peaks by height (largest first) and keep frequencies in that order.
-    [pkSorted, idx] = sort(pk, 'descend');
-    freqSorted      = locs(idx);
+    % Peaks analysis
+    [Peaks, Locs] = findpeaks(psdx, freq); % Find spectral peaks and their frequencies
 
-    % Use up to the top 5 strongest peaks as our feature set.
-    Ntop     = min(5, numel(freqSorted));
-    topFreqs = freqSorted(1:Ntop);
+    if isempty(Peaks) % If no peaks are found
+        MusicType = 'Unknown'; % Return "Unknown"
+        fprintf('\nFile: %s\n  (no peaks found)\n', fileName); % Print message
+        return; % Exit function
+    end % End empty peak check
 
-    % ---------- 4. Compute features ----------
-    fundFreq    = topFreqs(1);           % Fundamental ~ strongest peak frequency
-    meanTopFreq = mean(topFreqs);        % Average of top N peak frequencies
+    peakThresh   = 0.10 * max(Peaks); % Threshold = 10% of maximum peak height
+    strongMask   = Peaks >= peakThresh; % Logical mask for "strong" peaks
+    strongPeaks  = Peaks(strongMask); % Strong peak heights
+    strongLocs   = Locs(strongMask); % Strong peak frequencies
 
-    if Ntop > 1
-        spacing     = diff(topFreqs);    % Differences between consecutive peak freqs
-        meanSpacing = mean(spacing);     % Average spacing (harmonic spacing)
-        stdSpacing  = std(spacing);      % Regularity of spacing
-    else
-        meanSpacing = NaN;               % Not defined with only one peak
-        stdSpacing  = NaN;
-    end
+    if isempty(strongPeaks) % If no peaks pass the threshold
+        strongPeaks = Peaks; % Fall back to all peaks
+        strongLocs  = Locs; % Use all peak locations
+    end % End fallback check
 
-    numPeaks = Ntop;                     % Number of strong peaks considered
+    [~, idxMax] = max(strongPeaks); % Index of largest strong peak
+    fundFreq    = strongLocs(idxMax); % Fundamental frequency (dominant strong peak)
 
-    % ---------- 5. Debug printout (very useful for tuning) ----------
-    fprintf('\nFile: %s\n', fileName);
-    fprintf('  fundFreq     = %.2f Hz\n', fundFreq);
-    fprintf('  meanTopFreq  = %.2f Hz\n', meanTopFreq);
-    fprintf('  meanSpacing  = %.2f Hz   (std = %.1f)\n', meanSpacing, stdSpacing);
-    fprintf('  numPeaks     = %d\n', numPeaks);
+    [~, idxSort] = sort(strongPeaks, 'descend'); % Sort strong peaks by height (descending)
+    sortedFreqs  = strongLocs(idxSort); % Reorder frequencies by peak height
+    topFreqs     = sortedFreqs(1:min(10, length(sortedFreqs))); % Take top 10 strong frequencies
 
-    % ============================================================
-    %                 6. CLASSIFICATION RANGES
-    %      These are built from your measured training data
-    % ============================================================
+    topFreqs = sort(topFreqs); % Sort chosen peaks by frequency
+    if numel(topFreqs) > 1 % If more than one peak is available
+        spacing = diff(topFreqs); % Frequency differences between peaks
+        meanSpacing = mean(spacing); % Average spacing between top peaks
+    else % If only one peak is available
+        meanSpacing = NaN; % Spacing is undefined (set to NaN)
+    end % End spacing calculation
 
-    % ===== ANIMALS (animals.aifc, lion.aifc) =====
-    % Both animals clips have small POSITIVE spacing (~20–30 Hz) and 2–5 peaks.
-    % We don't rely heavily on fundamental frequency here.
-    animalFundRange     = [80 2000];      % Ignore very low fundamentals (< 80 Hz)
-    animalSpacingRange  = [20 35];        % Positive spacing of about 20–30 Hz
-    animalMinPeaks      = 2;
-    animalMaxPeaks      = 6;
+    numPeaks = numel(strongPeaks); % Count total number of strong peaks
 
-    % ===== COUNTRY (country.aifc) =====
-    % country: fund ≈ 882 Hz, meanSpacing ≈ -171 Hz, ~5 peaks.
-    countryFundRange    = [840 920];
-    countrySpacingRange = [-260 -120];    % Large NEGATIVE spacing around -170 Hz
-    countryMinPeaks     = 4;
-    countryMaxPeaks     = 7;
+    % Print information
+    fprintf('\nFile: %s\n', fileName); % Print file name
+    fprintf('  fundFreq    = %.2f Hz\n', fundFreq); % Print fundamental frequency
+    fprintf('  meanSpacing = %.2f Hz\n', meanSpacing); % Print mean spacing
+    fprintf('  numPeaks    = %d\n',     numPeaks);  % Print number of strong peaks
 
-    % ===== CLASSICAL (classical.aifc) =====
-    % classical: fund ≈ 1075 Hz, meanSpacing ≈ -177 Hz, 2 peaks.
-    classicalFundRange    = [1000 1150];
-    classicalSpacingRange = [-260 -120];  % Similar negative spacing to country
-    classicalMinPeaks     = 1;
-    classicalMaxPeaks     = 3;
+    % Classification ranges
 
-    % ===== EDM / DANCE (edm.aifc + many memes) =====
-    % EDM base: fund ≈ 32 Hz, 1 strong peak, spacing often NaN.
-    % Many meme songs also have low fundamentals (< 80 Hz) and few peaks.
-    edmFundRange  = [0 80];              % Low-frequency dominant beat
-    edmMinPeaks   = 1;
-    edmMaxPeaks   = 3;                   % 1–3 strong peaks
+    inRange = @(val, R) ~isnan(val) && val >= R(1) && val <= R(2); % Checks value in [min max]
 
-    % Helper: checks if a value is inside a [min max] range and not NaN.
-    inRange = @(val, R) ~isnan(val) && val >= R(1) && val <= R(2);
+    % Animals reference values (from analysis script)
+    % animals.aifc: fundamental 912 Hz, many peaks, small spacing
+    % lion.aifc: fundamental 132 Hz, many peaks, small spacing
+    animalFundRange1 = [880 950]; % Main fundamental range for animals sound file
+    animalFundRange2 = [130 135]; % Narrow second range to capture lion but not others
+    animalSpacingRange = [0   25]; % Allowed mean spacing for animal sounds
+    animalPeaksRange = [100 500]; % Allowed number of strong peaks for animals
 
-    % ============================================================
-    %                 7. IF / ELSE CLASSIFIER
-    %    Order matters – most specific / distinctive first
-    % ============================================================
+    %Classical reference values
+    % classical.aifc: fundamental 1075 Hz, moderate spacing and peaks
+    classicalFundRange = [1020 1120]; % Allowed fundamental range for classical
+    classicalSpacingRange = [8   40]; % Allowed mean spacing range for classical
+    classicalPeaksRange = [30  120]; % Allowed number of strong peaks for classical
 
-    % ----- CLASSICAL: high fund, negative spacing, few peaks, regular spacing -----
-    if inRange(fundFreq, classicalFundRange) && ...
-       inRange(meanSpacing, classicalSpacingRange) && ...
-       numPeaks >= classicalMinPeaks && numPeaks <= classicalMaxPeaks && ...
-       (isnan(stdSpacing) || stdSpacing < 150)          % spacing not too wild
+    % Country reference values
+    % country.aifc: fundamental 882 Hz (plus lower harmonic range near 590 Hz)
+    countryFundRange1 = [560 620]; % Optional lower fundamental range for country
+    countryFundRange2 = [840 920]; % Main fundamental range for country
+    countrySpacingRange = [15  55]; % Allowed mean spacing range for country
+    countryPeaksRange = [60  260]; % Allowed number of strong peaks for country
 
-        MusicType = 'Classical';
+    % EDM reference values (many random meme sounds fall in here)
+    % Fundamentals:EDM 32 Hz; pop/EDM around 45–110 Hz
+    edmFundRange = [25 110]; % Single fundamental range for EDM
+    edmSpacingRange = [0.5 8.0]; % EDM has relatively small peak spacing
+    edmMaxPeaks = 250; % Upper limit on peaks to avoid "talking cat"
 
-    % ----- COUNTRY: mid-high fund, negative spacing, more peaks -----
-    elseif inRange(fundFreq, countryFundRange) && ...
-           inRange(meanSpacing, countrySpacingRange) && ...
-           numPeaks >= countryMinPeaks && numPeaks <= countryMaxPeaks
+    % IF/ELSE classifiers
 
-        MusicType = 'Country';
+    if ( inRange(fundFreq, animalFundRange1) || ... % If in main animal fundfreq range
+         inRange(fundFreq, animalFundRange2) ) && ... % or in lion specific range
+       (isnan(meanSpacing) || inRange(meanSpacing, animalSpacingRange)) && ... % And spacing in range or NaN
+       inRange(numPeaks, animalPeaksRange) % And number of peaks within animal range
 
-    % ----- EDM: very low fundamental and few peaks (spacing not trusted) -----
-    elseif inRange(fundFreq, edmFundRange) && ...
-           numPeaks >= edmMinPeaks && numPeaks <= edmMaxPeaks
+        MusicType = 'Animals'; % Classify as Animals
 
-        MusicType = 'EDM';
+    elseif inRange(fundFreq, classicalFundRange) && ... % Else if in classical fundfreq range
+           (isnan(meanSpacing) || inRange(meanSpacing, classicalSpacingRange)) && ... % And spacing in range or Nan
+           inRange(numPeaks, classicalPeaksRange) % And peaks in classical range
 
-    % ----- ANIMALS: small positive spacing, several peaks, not very low fund -----
-    elseif inRange(fundFreq, animalFundRange) && ...
-           inRange(meanSpacing, animalSpacingRange) && ...
-           numPeaks >= animalMinPeaks && numPeaks <= animalMaxPeaks
+        MusicType = 'Classical'; % Classify as Classical
 
-        MusicType = 'Animals';
+    elseif ( inRange(fundFreq, countryFundRange1) || ... % Else if in either country range
+             inRange(fundFreq, countryFundRange2) ) && ... % includes both ranges
+           (isnan(meanSpacing) || inRange(meanSpacing, countrySpacingRange)) && ... % And spacing in range or NaN
+           inRange(numPeaks, countryPeaksRange) % And peaks in country range
 
-    % ----- Unknown fallback -----
-    else
-        MusicType = 'Unknown';
-    end
+        MusicType = 'Country'; % Classify as Country
 
-    fprintf('  ==> Classified as: %s\n', MusicType);
-end
+    elseif inRange(fundFreq, edmFundRange) && ... % Else if fundFreq in EDM range
+           (isnan(meanSpacing) || inRange(meanSpacing, edmSpacingRange)) && ... % And spacing in range or NaN
+           (numPeaks <= edmMaxPeaks) % And not too many peaks
+
+        MusicType = 'EDM'; % Classify as EDM
+
+    else % If none of the above matches
+        MusicType = 'Unknown'; % Classify as Unknown
+    end % End if/elseif
+
+    fprintf('Classified as: %s\n', MusicType); % Print final classification to Command Window
+end % End of Shazam function
