@@ -10,7 +10,7 @@ function MusicType = Shazam(fileName)
     % Plot raw audio 
     figure; %Set to new figure
     subplot(2,1,1); %Assign current sound plot to subplot
-    plot(t, Sounds(:,1)); %Plot sounds over time
+    plot(t, left); %Plot sounds over time
     xlabel('Time (s)'); %Label x axis
     ylabel('Amplitude'); %Label y axis
     [~, SoundName, ~] = fileparts(fileName); %Extract SoundName from file
