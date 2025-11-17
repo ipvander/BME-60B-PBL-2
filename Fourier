@@ -6,6 +6,7 @@ function MusicType = Shazam(fileName)
     % Reads the audio
     [Sounds, fs] = audioread(fileName); % Read audio file and sampling rate
     left         = Sounds(:,1); % Use left channel only
+    t = 0:1/fs:(length(Sounds)-1)/fs; %Create time vector
 
     % Plot raw audio 
     figure; %Set to new figure
