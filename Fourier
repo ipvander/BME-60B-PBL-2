@@ -4,7 +4,13 @@
 % Includes improved peak analysis (number top peaks, spacing)
 clear all; close all; clc;
 
-Dir = fullfile(pwd, 'Sound Clips', 'Chosen Clips'); %Pulls up 4 known sound
+%Makes user select Chosen Clips file
+Dir = uigetdir(pwd, ['Select Chosen Clips folder containing .aifc files'...
+    ' in Sound Files folder']);
+if Dir == 0
+    error('Folder not selected.'); %Presents error if folder not selected
+end
+
 cd(Dir) % Sets Chosen Clips as directory
 GetDir = dir('*.aifc'); %Uploads known sounds
 
