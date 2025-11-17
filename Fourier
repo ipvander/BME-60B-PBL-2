@@ -5,8 +5,12 @@
 % Script to test our Shazam function on known and unknown sound clips
 clear; clc; close all;
 fprintf('Testing Shazam.m\n\n');
+
+% Prompts user to select the top-level folder
+topFolder = uigetdir(pwd, 'Select top-level Sound Clips folder');
+chosenFolder = fullfile(topFolder, 'Chosen Clips'); %Opens chosen clips
+
 % Test all of the 4 known sound files
-% Runs the Shazam classifier on a small set of labeled training clips
 knownFiles = { ...
     'animals.aifc', ...
     'classical.aifc', ...
@@ -19,39 +23,32 @@ knownLabels = { ...
     'EDM' };
 fprintf('Known files:\n');
 for k = 1:numel(knownFiles)
-    file = knownFiles{k};
-    expected = knownLabels{k};
+    file = fullfile(chosenFolder, knownFiles{k}); %selects file from folder
+    expected = knownLabels{k}; %Sets expected output to file name
     if exist(file, 'file')
-        musicType = Shazam(file);
-        fprintf('Expected: %s\n\n', expected);
+        musicType = Shazam(file); %run function through each sound file
+        fprintf('Expected: %s\n\n', expected); %Prints expected output
     else
         fprintf('  File not found in current folder. Skipping.\n\n');
     end
 end
-% Test all of the unknown sound files
-% Runs Shazam on several unknown files and print results
+
+% Other/unknown files in top-level folder (or subfolders)
+% Get all .aifc files in topFolder and subfolders
+unknownFolder = topFolder;
+
+% Runs Shazam on select unknown files and print results
 unknownFiles = { ...
-    'all star inverted.aifc', ...
-    'all star.aifc', ...
     'blue.aifc', ...
-    'careless whisper.aifc', ...
     'despacito.aifc', ...
-    'drake.aifc', ...
-    'friday.aifc', ...
-    'kekistan.aifc', ...
-    'lion.aifc', ...
-    'peanut butter jelly time.aifc', ...
-    'rick roll.aifc', ...
-    'talking cat.aifc', ...
-    'what is love.aifc', ...
-    'x files.aifc' };
+    'lion.aifc'};
 fprintf('Testing Unknown Files:\n\n');
 for k = 1:numel(unknownFiles)
-    file = unknownFiles{k};
+    file = fullfile(unknownFolder, unknownFiles{k}); %selects file
     fprintf('Testing file: %s\n', file);
-    if exist(file, 'file')
-        musicType = Shazam(file);
-        fprintf('  Shazam classification: %s\n\n', musicType);
+    if exist(file, 'file') %Checks to see if file is found
+        musicType = Shazam(file); %Runs function on unknown file
+        fprintf('  Shazam classification: %s\n\n', musicType); %Outputs class
     else
         fprintf('  File not found in current folder. Skipping.\n\n');
     end
